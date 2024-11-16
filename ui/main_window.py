@@ -19,6 +19,7 @@ from ui.dialogs.help_dialog import HelpDialog
 from ui.dialogs.details_dialog import SongDetailsDialog
 from ui.dialogs.mastering_dialog import MasteringOptionsDialog
 from ui.dialogs.similarity_options_dialog import SimilarityOptionsDialog
+from ui.dialogs.analysis_dialog import AudioAnalysisDialog
 from core.analyzer import SimilarityThread
 from core.mastering import MasteringThread
 from config.theme import COMBINED_STYLE
@@ -147,6 +148,10 @@ class MASTWindow(QMainWindow):
         self.master_button.clicked.connect(self.master_with_reference)
         self.master_button.setEnabled(False)
         controls_layout.addWidget(self.master_button)
+        
+        self.analysis_button = QPushButton('Audio Analysis')
+        self.analysis_button.clicked.connect(self.show_audio_analysis)
+        controls_layout.addWidget(self.analysis_button)
 
         layout.addLayout(controls_layout)
 
@@ -192,6 +197,26 @@ class MASTWindow(QMainWindow):
             self.music_directory = directory
             self.directory_label.setText(f'Selected: {directory}')
 
+    def show_audio_analysis(self):
+        if not self.song_to_master:
+            QMessageBox.warning(self, "Error", "Please select a song to analyze")
+            return
+            
+        # Create analysis dialog with both songs if reference is selected
+        if self.reference_song:
+            dialog = AudioAnalysisDialog(
+                file_path=self.song_to_master,
+                reference_path=self.reference_song,
+                parent=self
+            )
+        else:
+            dialog = AudioAnalysisDialog(
+                file_path=self.song_to_master,
+                parent=self
+            )
+        
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.exec_()    
     def show_settings(self):
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec_() == QDialog.Accepted:

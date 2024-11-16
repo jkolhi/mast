@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
+from .analysis_dialog import AudioAnalysisDialog
 
 class SongDetailsDialog(QDialog):
     def __init__(self, song_path, parent=None):
@@ -138,6 +139,25 @@ class SongDetailsDialog(QDialog):
         play_button.clicked.connect(self.play_song)
         layout.addWidget(play_button)
 
+        # Add button layout
+        button_layout = QHBoxLayout()
+        
+        play_button = QPushButton('Play')
+        play_button.clicked.connect(self.play_song)
+        button_layout.addWidget(play_button)
+
+        analyze_button = QPushButton('Audio Analysis')
+        analyze_button.clicked.connect(self.show_audio_analysis)
+        button_layout.addWidget(analyze_button)
+
+        layout.addLayout(button_layout)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Close
+        )
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
         self.setLayout(layout)
 
     def _extract_artwork(self, audio):
@@ -175,6 +195,14 @@ class SongDetailsDialog(QDialog):
         except Exception as e:
             print(f"Error extracting artwork: {e}")
             return None
+        
+    def show_audio_analysis(self):
+        dialog = AudioAnalysisDialog(
+            file_path=self.song_path,
+            parent=self
+        )
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.exec_()
 
     def play_song(self):
         try:
