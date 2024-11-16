@@ -10,88 +10,117 @@ class HelpDialog(QDialog):
 
     def initUI(self):
         self.setWindowTitle('MAST - Help')
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(400)
-
-        # Apply dark theme
-        self.setStyleSheet("""
-            QDialog, QWidget {
-                background-color: #1A365D;
-            }
-            QLabel {
-                color: #E2E8F0;
-                font-size: 13px;
-            }
-            QPushButton {
-                background-color: #4299E1;
-                color: white;
-                padding: 6px 12px;
-                border-radius: 4px;
-                border: none;
-                min-width: 80px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2B6CB0;
-            }
-            QScrollArea {
-                border: 1px solid #4299E1;
-                border-radius: 4px;
-            }
-            QTextBrowser {
-                background-color: #2D3748;
-                color: #E2E8F0;
-                border: none;
-                font-size: 13px;
-            }
-        """)
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(600)
 
         layout = QVBoxLayout(self)
 
-        # Create a QTextBrowser for the help content
         help_text = QTextBrowser()
         help_text.setOpenExternalLinks(True)
         help_text.setHtml("""
             <h2 style='color: #63B3ED;'>MAST - Master Audio Similarity Tool</h2>
             
             <h3 style='color: #63B3ED;'>Overview</h3>
-            <p>MAST helps you find similar songs in your music collection and master your audio files to match the sound of reference tracks.</p>
+            <p>MAST is a professional audio tool that combines two powerful features:
+            finding similar songs in your music collection and mastering your audio files to match the sound of reference tracks.</p>
+            
+            <h3 style='color: #63B3ED;'>Getting Started</h3>
+            <p>First-time setup:</p>
+            <ol>
+                <li>Open Settings (⚙) and set your default music directory</li>
+                <li>Configure your preferred audio output settings (format, bit depth, MP3 bitrate)</li>
+                <li>Adjust similarity search settings to your needs</li>
+            </ol>
             
             <h3 style='color: #63B3ED;'>Main Features</h3>
+            
+            <h4 style='color: #63B3ED;'>1. Audio Players</h4>
             <ul>
-                <li><b>Song Similarity Search:</b> Find songs that sound similar to your selected track using audio analysis</li>
-                <li><b>Audio Mastering:</b> Match the sound characteristics of one song to another using the Matchering engine</li>
-                <li><b>Metadata Viewing:</b> View detailed song information including embedded artwork</li>
+                <li>Two built-in audio players for easy comparison</li>
+                <li>Independent volume controls for each track</li>
+                <li>Instant playback of selected files</li>
+                <li>Time display and seeking capability</li>
             </ul>
             
-            <h3 style='color: #63B3ED;'>How to Use</h3>
+            <h4 style='color: #63B3ED;'>2. Finding Similar Songs</h4>
             <ol>
-                <li><b>Finding Similar Songs:</b>
+                <li>Select your reference track using "Select Song to Master"</li>
+                <li>Ensure your music directory is set</li>
+                <li>Click "Find Similar Songs"</li>
+                <li>The results will show:
                     <ul>
-                        <li>Click "Select Song to Master" to choose your reference track</li>
-                        <li>Set your music directory (or use the default from settings)</li>
-                        <li>Click "Find Similar Songs" to start the search</li>
-                        <li>Results will be shown in the list, sorted by similarity</li>
-                    </ul>
-                </li>
-                <br>
-                <li><b>Mastering a Song:</b>
-                    <ul>
-                        <li>Select your target song using "Select Song to Master"</li>
-                        <li>Choose a reference song either by:
-                            <ul>
-                                <li>Using "Select Reference Song" button</li>
-                                <li>Selecting a song from the similarity results and clicking "Use Selected as Reference"</li>
-                            </ul>
-                        </li>
-                        <li>Click "Master Song" to start the mastering process</li>
-                        <li>Choose your desired output format and settings</li>
+                        <li>Songs sorted by similarity</li>
+                        <li>Similarity score for each track</li>
+                        <li>Double-click any song to view detailed metadata</li>
                     </ul>
                 </li>
             </ol>
             
-            <h3 style='color: #63B3ED;'>Audio Formats</h3>
-            <p>Supported formats:</p>
+            <h4 style='color: #63B3ED;'>3. Audio Mastering</h4>
+            <p>Two ways to master your audio:</p>
+            <ol>
+                <li>Direct Selection:
+                    <ul>
+                        <li>Select your song to master</li>
+                        <li>Use "Select Reference Song" to choose your reference track</li>
+                        <li>Click "Master Song"</li>
+                    </ul>
+                </li>
+                <li>From Similarity Results:
+                    <ul>
+                        <li>Find similar songs first</li>
+                        <li>Select a song from the results</li>
+                        <li>Click "Use Selected as Reference"</li>
+                        <li>Click "Master Song"</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h4 style='color: #63B3ED;'>4. Audio Analysis and Comparison</h4>
+            <ul>
+                <li>Click "Compare Songs" to see:
+                    <ul>
+                        <li>Waveform visualization</li>
+                        <li>Spectrum analysis</li>
+                        <li>Side-by-side comparison</li>
+                        <li>Key and BPM information</li>
+                    </ul>
+                </li>
+                <li>Double-click any song to view:
+                    <ul>
+                        <li>Detailed metadata</li>
+                        <li>Technical information</li>
+                        <li>Embedded artwork</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h3 style='color: #63B3ED;'>Tips for Best Results</h3>
+            <ul>
+                <li><b>Similarity Search:</b>
+                    <ul>
+                        <li>Use a high-quality reference track</li>
+                        <li>Adjust similarity threshold in settings for broader or narrower results</li>
+                        <li>Export results for later reference</li>
+                    </ul>
+                </li>
+                <li><b>Mastering:</b>
+                    <ul>
+                        <li>Use reference tracks with similar genre/style</li>
+                        <li>Compare before mastering using the analysis tools</li>
+                        <li>Choose appropriate output formats for your needs</li>
+                    </ul>
+                </li>
+                <li><b>File Management:</b>
+                    <ul>
+                        <li>Organize your music directory for faster searches</li>
+                        <li>Use the comparison tool to verify results</li>
+                        <li>Save your preferred settings for consistency</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h3 style='color: #63B3ED;'>Supported Audio Formats</h3>
             <ul>
                 <li>WAV (16/24/32-bit)</li>
                 <li>FLAC</li>
@@ -128,20 +157,35 @@ class HelpDialog(QDialog):
                 <li>Interface design and programming assistance by Claude (Anthropic)</li>
                 <li>Built to provide an intuitive interface for audio similarity analysis and mastering</li>
             </ul>
-
-            <h3 style='color: #63B3ED;'>Tips</h3>
-            <ul>
-                <li>Use the Settings dialog to set your default preferences</li>
-                <li>You can play any song in the results list by selecting it and clicking "Play Selected"</li>
-                <li>Export your similarity search results using the "Export Results" button</li>
-                <li>Double-click any song in the list to see detailed information and artwork</li>
-                <li>The mastered song will automatically open in the details viewer when complete</li>
-            </ul>
         """)
         
         layout.addWidget(help_text)
 
-        # Add OK button
         button_box = QDialogButtonBox(QDialogButtonBox.Ok)
         button_box.accepted.connect(self.accept)
         layout.addWidget(button_box)
+        
+        # Apply dark theme
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1A365D;
+            }
+            QTextBrowser {
+                background-color: #2D3748;
+                color: #E2E8F0;
+                border: none;
+                font-size: 13px;
+            }
+            QPushButton {
+                background-color: #4299E1;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 4px;
+                border: none;
+                min-width: 80px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2B6CB0;
+            }
+        """)

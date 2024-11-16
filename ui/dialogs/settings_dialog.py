@@ -74,14 +74,15 @@ class SettingsDialog(QDialog):
         similarity_group = QGroupBox("Similarity Search Settings")
         similarity_layout = QVBoxLayout()
 
-        # Threshold
+        # Default threshold
         threshold_layout = QHBoxLayout()
-        threshold_layout.addWidget(QLabel("Similarity Threshold:"))
-        self.threshold_slider = QSlider(Qt.Horizontal)
+        threshold_layout.addWidget(QLabel("Default Similarity Threshold:"))
+        self.threshold_slider = QSlider(Qt.Horizontal)  # Fixed: Changed variable name
         self.threshold_slider.setMinimum(0)
         self.threshold_slider.setMaximum(100)
-        self.threshold_slider.setValue(int(float(self.settings.value('similarity_threshold', '50')) * 100))
-        self.threshold_value_label = QLabel(f"{self.threshold_slider.value()}%")
+        current_threshold = int(float(self.settings.value('similarity_threshold', '0.5')) * 100)
+        self.threshold_slider.setValue(current_threshold)
+        self.threshold_value_label = QLabel(f"{current_threshold}%")
         self.threshold_slider.valueChanged.connect(
             lambda: self.threshold_value_label.setText(f"{self.threshold_slider.value()}%")
         )
@@ -89,7 +90,7 @@ class SettingsDialog(QDialog):
         threshold_layout.addWidget(self.threshold_value_label)
         similarity_layout.addLayout(threshold_layout)
 
-        # Max results
+        # Default max results
         results_layout = QHBoxLayout()
         results_layout.addWidget(QLabel("Maximum Results:"))
         self.max_results_input = QLineEdit()
@@ -99,6 +100,7 @@ class SettingsDialog(QDialog):
 
         similarity_group.setLayout(similarity_layout)
         layout.addWidget(similarity_group)
+
         # Buttons
         button_box = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
@@ -120,12 +122,7 @@ class SettingsDialog(QDialog):
                 border: 1px solid #4299E1;
                 border-radius: 4px;
                 margin-top: 1em;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
+                padding: 10px;
             }
             QLabel {
                 color: #E2E8F0;
@@ -182,6 +179,6 @@ class SettingsDialog(QDialog):
         self.settings.setValue('default_format', self.default_format.currentText())
         self.settings.setValue('default_bitdepth', self.default_bitdepth.currentText())
         self.settings.setValue('default_bitrate', self.default_bitrate.currentText())
-        self.settings.setValue('default_threshold', self.default_threshold.value() / 100.0)
-        self.settings.setValue('default_max_results', self.default_max_results.text())
+        self.settings.setValue('similarity_threshold', self.threshold_slider.value() / 100.0)
+        self.settings.setValue('max_results', self.max_results_input.text())
         self.settings.sync()
