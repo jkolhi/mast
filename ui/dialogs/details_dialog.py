@@ -1,15 +1,14 @@
 import os
-import sys
-import subprocess
 from datetime import datetime
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QDialogButtonBox, QScrollArea, 
-    QWidget, QMessageBox
+    QWidget, QGroupBox
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
-from .analysis_dialog import AudioAnalysisDialog
+from ui.dialogs.analysis_dialog import AudioAnalysisDialog
+from ui.widgets.audio_player import AudioPlayer
 
 class SongDetailsDialog(QDialog):
     def __init__(self, song_path, parent=None):
@@ -51,6 +50,14 @@ class SongDetailsDialog(QDialog):
             import mutagen
             audio = mutagen.File(self.song_path)
             if audio is not None:
+                # Extract and display artwork
+                pixmap = self._extract_artwork(audio)
+                if pixmap is not None:
+                    scaled_pixmap = pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    artwork_label.setPixmap(scaled_pixmap)
+                else:
+                    artwork_label.setText("No\nArtwork")
+
                 # Duration
                 if hasattr(audio.info, 'length'):
                     minutes = int(audio.info.length // 60)
@@ -72,13 +79,6 @@ class SongDetailsDialog(QDialog):
                 # Format
                 format_type = os.path.splitext(self.song_path)[1][1:].upper()
                 details.append(f"Format: {format_type}")
-                
-                # Extract and display artwork
-                pixmap = self._extract_artwork(audio)
-                if pixmap is not None:
-                    artwork_label.setPixmap(pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                else:
-                    artwork_label.setText("No\nArtwork")
                 
                 # Tags
                 if hasattr(audio, 'tags') and audio.tags:
@@ -127,24 +127,17 @@ class SongDetailsDialog(QDialog):
         # Add the content layout to the main layout
         layout.addLayout(content_layout)
 
-        # Buttons
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
-        )
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-
-        play_button = QPushButton('Play')
-        play_button.clicked.connect(self.play_song)
-        layout.addWidget(play_button)
+        # Add audio player
+        player_group = QGroupBox("Audio Player")
+        player_layout = QVBoxLayout()
+        self.audio_player = AudioPlayer()
+        self.audio_player.loadFile(self.song_path)
+        player_layout.addWidget(self.audio_player)
+        player_group.setLayout(player_layout)
+        layout.addWidget(player_group)
 
         # Add button layout
         button_layout = QHBoxLayout()
-        
-        play_button = QPushButton('Play')
-        play_button.clicked.connect(self.play_song)
-        button_layout.addWidget(play_button)
 
         analyze_button = QPushButton('Audio Analysis')
         analyze_button.clicked.connect(self.show_audio_analysis)
@@ -152,17 +145,67 @@ class SongDetailsDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.Close
-        )
+        # Dialog buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.Close)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 
         self.setLayout(layout)
+        
+        # Apply dark theme
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1A365D;
+            }
+            QLabel {
+                color: #E2E8F0;
+                font-size: 12px;
+                margin: 2px;
+            }
+            QPushButton {
+                background-color: #4299E1;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 4px;
+                border: none;
+                min-width: 80px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2B6CB0;
+            }
+            QScrollArea {
+                border: 1px solid #4299E1;
+                border-radius: 4px;
+                background-color: #2D3748;
+            }
+            QGroupBox {
+                color: #E2E8F0;
+                font-weight: bold;
+                border: 1px solid #4299E1;
+                border-radius: 4px;
+                margin-top: 1em;
+                padding: 10px;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background-color: #2D3748;
+                width: 12px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #4299E1;
+                min-height: 20px;
+                border-radius: 6px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+            }
+        """)
 
     def _extract_artwork(self, audio):
         try:
-            # Try different methods to extract artwork
             if hasattr(audio, 'tags'):
                 # ID3 tags (MP3)
                 if hasattr(audio.tags, 'getall'):
@@ -190,12 +233,11 @@ class SongDetailsDialog(QDialog):
                         pixmap = QPixmap()
                         pixmap.loadFromData(artwork_data)
                         return pixmap
-            
             return None
         except Exception as e:
             print(f"Error extracting artwork: {e}")
             return None
-        
+
     def show_audio_analysis(self):
         dialog = AudioAnalysisDialog(
             file_path=self.song_path,
@@ -203,14 +245,3 @@ class SongDetailsDialog(QDialog):
         )
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec_()
-
-    def play_song(self):
-        try:
-            if sys.platform.startswith('darwin'):
-                subprocess.call(('open', self.song_path))
-            elif sys.platform.startswith('win'):
-                os.startfile(self.song_path)
-            else:
-                subprocess.call(('xdg-open', self.song_path))
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Could not play file: {str(e)}")

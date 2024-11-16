@@ -2,24 +2,24 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QListWidget, QFileDialog, 
     QProgressBar, QMessageBox, QStyle, QListWidgetItem,
-    QMenuBar, QDialog
+    QMenuBar, QDialog, QGroupBox
 )
 from PyQt5.QtCore import Qt, QSettings
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPixmap
 import os
-from pathlib import Path
-import tempfile
 import sys
 import csv
 from datetime import datetime
+from pathlib import Path
+import tempfile
 import subprocess
 
 from ui.dialogs.settings_dialog import SettingsDialog
 from ui.dialogs.help_dialog import HelpDialog
 from ui.dialogs.details_dialog import SongDetailsDialog
 from ui.dialogs.mastering_dialog import MasteringOptionsDialog
-from ui.dialogs.similarity_options_dialog import SimilarityOptionsDialog
-from ui.dialogs.analysis_dialog import AudioAnalysisDialog
+from ui.dialogs.comparison_dialog import AudioComparisonDialog
+from ui.widgets.audio_player import AudioPlayer
 from core.analyzer import SimilarityThread
 from core.mastering import MasteringThread
 from config.theme import COMBINED_STYLE
@@ -60,14 +60,51 @@ class MASTWindow(QMainWindow):
         # Top section with icon and buttons
         top_section = QHBoxLayout()
         
-        # Create icon label (you'll need to implement the icon creation)
+        # Create icon label
         icon_label = QLabel()
-        # Add your icon creation code here
+        svg_data = '''<?xml version="1.0" encoding="UTF-8"?>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="45" fill="#1A365D"/>
+            <path d="M30 50 Q40 20, 50 50 T70 50" 
+                  fill="none" 
+                  stroke="#4299E1" 
+                  stroke-width="4"
+                  stroke-linecap="round"/>
+            <path d="M25 50 Q40 10, 50 50 T75 50" 
+                  fill="none" 
+                  stroke="#63B3ED" 
+                  stroke-width="3"
+                  stroke-linecap="round"/>
+            <path d="M20 50 Q40 0, 50 50 T80 50" 
+                  fill="none" 
+                  stroke="#90CDF4" 
+                  stroke-width="2"
+                  stroke-linecap="round"/>
+        </svg>'''
+        
+        # Create temporary file for the SVG
+        with tempfile.NamedTemporaryFile(suffix='.svg', delete=False) as tmp_file:
+            tmp_file.write(svg_data.encode())
+            icon_path = tmp_file.name
+
+        # Create QPixmap from the SVG and scale it
+        pixmap = QIcon(icon_path).pixmap(50, 50)  # 50x50 pixels
+        icon_label.setPixmap(pixmap)
+        
+        # Clean up temporary file
+        os.unlink(icon_path)
+
+        # Add icon to the left side
         top_section.addWidget(icon_label)
         
         # Add title next to icon
         title_label = QLabel('MAST - Master Audio Similarity Tool')
-        title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+            }
+        """)
         top_section.addWidget(title_label)
         
         # Add stretch to push buttons to the right
@@ -86,23 +123,45 @@ class MASTWindow(QMainWindow):
         layout.addLayout(top_section)
         layout.addSpacing(10)
 
-        # Song to master selection
+        # Song to master section with player
+        master_group = QGroupBox("Song to Master")
+        master_layout = QVBoxLayout()
+        
+        # File selection
         song_layout = QHBoxLayout()
         self.song_to_master_label = QLabel('No song selected')
-        select_song_btn = QPushButton('Select Song to Master')
+        select_song_btn = QPushButton('Select Song')
         select_song_btn.clicked.connect(self.select_song_to_master)
         song_layout.addWidget(self.song_to_master_label)
         song_layout.addWidget(select_song_btn)
-        layout.addLayout(song_layout)
+        master_layout.addLayout(song_layout)
+        
+        # Add player
+        self.master_player = AudioPlayer()
+        master_layout.addWidget(self.master_player)
+        
+        master_group.setLayout(master_layout)
+        layout.addWidget(master_group)
 
-        # Reference song selection
+        # Reference song section with player
+        reference_group = QGroupBox("Reference Song")
+        reference_layout = QVBoxLayout()
+        
+        # File selection
         ref_song_layout = QHBoxLayout()
         self.reference_song_label = QLabel('No reference song selected')
-        select_ref_btn = QPushButton('Select Reference Song')
+        select_ref_btn = QPushButton('Select Song')
         select_ref_btn.clicked.connect(self.select_reference_song)
         ref_song_layout.addWidget(self.reference_song_label)
         ref_song_layout.addWidget(select_ref_btn)
-        layout.addLayout(ref_song_layout)
+        reference_layout.addLayout(ref_song_layout)
+        
+        # Add player
+        self.reference_player = AudioPlayer()
+        reference_layout.addWidget(self.reference_player)
+        
+        reference_group.setLayout(reference_layout)
+        layout.addWidget(reference_group)
 
         # Directory selection
         dir_layout = QHBoxLayout()
@@ -115,11 +174,8 @@ class MASTWindow(QMainWindow):
 
         # Search controls
         button_layout = QHBoxLayout()
-        options_btn = QPushButton('Search Options')
         compare_btn = QPushButton('Find Similar Songs')
-        options_btn.clicked.connect(self.show_similarity_options)
         compare_btn.clicked.connect(self.start_comparison)
-        button_layout.addWidget(options_btn)
         button_layout.addWidget(compare_btn)
         layout.addLayout(button_layout)
 
@@ -134,11 +190,6 @@ class MASTWindow(QMainWindow):
         # Control buttons
         controls_layout = QHBoxLayout()
         
-        self.play_button = QPushButton('Play Selected')
-        self.play_button.clicked.connect(self.play_selected_song)
-        self.play_button.setEnabled(False)
-        controls_layout.addWidget(self.play_button)
-
         self.use_as_reference_button = QPushButton('Use Selected as Reference')
         self.use_as_reference_button.clicked.connect(self.use_selected_as_reference)
         self.use_as_reference_button.setEnabled(False)
@@ -148,10 +199,10 @@ class MASTWindow(QMainWindow):
         self.master_button.clicked.connect(self.master_with_reference)
         self.master_button.setEnabled(False)
         controls_layout.addWidget(self.master_button)
-        
-        self.analysis_button = QPushButton('Audio Analysis')
-        self.analysis_button.clicked.connect(self.show_audio_analysis)
-        controls_layout.addWidget(self.analysis_button)
+
+        compare_button = QPushButton('Compare Songs')
+        compare_button.clicked.connect(self.show_comparison_dialog)
+        controls_layout.addWidget(compare_button)
 
         layout.addLayout(controls_layout)
 
@@ -176,6 +227,7 @@ class MASTWindow(QMainWindow):
         if file_path:
             self.song_to_master = file_path
             self.song_to_master_label.setText(f'Selected: {os.path.basename(file_path)}')
+            self.master_player.loadFile(file_path)
             self.update_master_button()
 
     def select_reference_song(self):
@@ -186,8 +238,22 @@ class MASTWindow(QMainWindow):
         if file_path:
             self.reference_song = file_path
             self.reference_song_label.setText(f'Selected: {os.path.basename(file_path)}')
+            self.reference_player.loadFile(file_path)
             self.update_master_button()
 
+    def use_selected_as_reference(self):
+        current_item = self.similar_songs_list.currentItem()
+        if not current_item:
+            return
+            
+        song_name = current_item.text().split(' (Similarity:')[0]
+        for song_path in self.current_similarities.keys():
+            if os.path.basename(song_path) == song_name:
+                self.reference_song = song_path
+                self.reference_song_label.setText(f'Selected: {os.path.basename(song_path)}')
+                self.reference_player.loadFile(song_path)
+                self.update_master_button()
+                break
     def select_music_directory(self):
         directory = QFileDialog.getExistingDirectory(
             self, 'Select Music Directory',
@@ -217,6 +283,39 @@ class MASTWindow(QMainWindow):
         
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec_()    
+
+    def show_comparison_dialog(self):
+        if not self.song_to_master:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Please select a song to master first"
+            )
+            return
+
+        dialog = AudioComparisonDialog(
+            file1_path=self.song_to_master,
+            file2_path=self.reference_song if self.reference_song else None,
+            parent=self
+        )
+        
+        # Connect signals to update main window
+        dialog.file1_changed.connect(self.update_song_to_master)
+        dialog.file2_changed.connect(self.update_reference_song)
+        
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.exec_()
+
+    def update_song_to_master(self, file_path):
+        self.song_to_master = file_path
+        self.song_to_master_label.setText(f'Selected: {os.path.basename(file_path)}')
+        self.update_master_button()
+
+    def update_reference_song(self, file_path):
+        self.reference_song = file_path
+        self.reference_song_label.setText(f'Selected: {os.path.basename(file_path)}')
+        self.update_master_button()
+
     def show_settings(self):
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec_() == QDialog.Accepted:
@@ -250,26 +349,25 @@ class MASTWindow(QMainWindow):
 
     def update_play_button(self):
         has_selection = bool(self.similar_songs_list.currentItem())
-        self.play_button.setEnabled(has_selection)
         self.use_as_reference_button.setEnabled(has_selection)
 
     def start_comparison(self):
         if not self.song_to_master or not self.music_directory:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Please select both a song to master and a music directory"
-            )
+            QMessageBox.warning(self, "Error", "Please select both a song to master and a music directory")
             return
 
         self.similar_songs_list.clear()
         self.progress_bar.setValue(0)
 
+        # Get threshold and max_results from settings
+        threshold = float(self.settings.value('similarity_threshold', 0.5))
+        max_results = int(self.settings.value('max_results', 50))
+
         self.comparison_thread = SimilarityThread(
             self.song_to_master,
             self.music_directory,
-            self.similarity_options['threshold'],
-            self.similarity_options['max_results']
+            threshold,
+            max_results
         )
         self.comparison_thread.update_progress.connect(self.progress_bar.setValue)
         self.comparison_thread.comparison_complete.connect(self.show_similar_songs)
@@ -296,7 +394,7 @@ class MASTWindow(QMainWindow):
             
         self.similar_songs_list.itemSelectionChanged.connect(self.update_play_button)
         self.similar_songs_list.itemDoubleClicked.connect(self.show_song_details)
-
+        
     def use_selected_as_reference(self):
         current_item = self.similar_songs_list.currentItem()
         if not current_item:
@@ -419,13 +517,30 @@ class MASTWindow(QMainWindow):
         else:
             output_path = target_path.parent / output_filename
 
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Question)
+        msg.setText("Start Mastering Process")
+        msg.setInformativeText(
+            f"Target: {target_path.name}\n"
+            f"Reference: {reference_path.name}\n"
+            f"Output: {output_filename}\n"
+            f"Format: {mastering_options['format'].upper()}\n"
+            f"{'Bitrate: ' + mastering_options['mp3_bitrate'] if mastering_options['format'] == 'mp3' else 'Subtype: ' + (mastering_options['subtype'] or 'Default')}\n\n"
+            "Do you want to continue?"
+        )
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg.setDefaultButton(QMessageBox.Yes)
+        msg.setStyleSheet(self.styleSheet())
+        
+        if msg.exec_() != QMessageBox.Yes:
+            return
+
         # Show mastering progress
         self.mastering_progress.show()
         self.mastering_progress.setValue(0)
         
         # Disable buttons during processing
         self.master_button.setEnabled(False)
-        self.play_button.setEnabled(False)
         self.use_as_reference_button.setEnabled(False)
 
         # Create and start mastering thread
@@ -438,7 +553,8 @@ class MASTWindow(QMainWindow):
         self.mastering_thread.progress_updated.connect(self.update_mastering_progress)
         self.mastering_thread.finished.connect(self.mastering_finished)
         self.mastering_thread.error_occurred.connect(self.show_mastering_error)
-        self.mastering_thread.start()        
+        self.mastering_thread.start()    
+        
     def export_results(self):
         if not self.current_similarities:
             QMessageBox.warning(self, "Export Failed", "No results to export")

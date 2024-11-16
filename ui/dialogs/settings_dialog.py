@@ -74,32 +74,31 @@ class SettingsDialog(QDialog):
         similarity_group = QGroupBox("Similarity Search Settings")
         similarity_layout = QVBoxLayout()
 
-        # Default threshold
+        # Threshold
         threshold_layout = QHBoxLayout()
-        threshold_layout.addWidget(QLabel("Default Similarity Threshold:"))
-        self.default_threshold = QSlider(Qt.Horizontal)
-        self.default_threshold.setMinimum(0)
-        self.default_threshold.setMaximum(100)
-        self.default_threshold.setValue(int(float(self.settings.value('default_threshold', '50')) * 100))
-        self.threshold_label = QLabel(f"{self.default_threshold.value()}%")
-        self.default_threshold.valueChanged.connect(
-            lambda: self.threshold_label.setText(f"{self.default_threshold.value()}%")
+        threshold_layout.addWidget(QLabel("Similarity Threshold:"))
+        self.threshold_slider = QSlider(Qt.Horizontal)
+        self.threshold_slider.setMinimum(0)
+        self.threshold_slider.setMaximum(100)
+        self.threshold_slider.setValue(int(float(self.settings.value('similarity_threshold', '50')) * 100))
+        self.threshold_value_label = QLabel(f"{self.threshold_slider.value()}%")
+        self.threshold_slider.valueChanged.connect(
+            lambda: self.threshold_value_label.setText(f"{self.threshold_slider.value()}%")
         )
-        threshold_layout.addWidget(self.default_threshold)
-        threshold_layout.addWidget(self.threshold_label)
+        threshold_layout.addWidget(self.threshold_slider)
+        threshold_layout.addWidget(self.threshold_value_label)
         similarity_layout.addLayout(threshold_layout)
 
-        # Default max results
+        # Max results
         results_layout = QHBoxLayout()
-        results_layout.addWidget(QLabel("Default Max Results:"))
-        self.default_max_results = QLineEdit()
-        self.default_max_results.setText(self.settings.value('default_max_results', '50'))
-        results_layout.addWidget(self.default_max_results)
+        results_layout.addWidget(QLabel("Maximum Results:"))
+        self.max_results_input = QLineEdit()
+        self.max_results_input.setText(self.settings.value('max_results', '50'))
+        results_layout.addWidget(self.max_results_input)
         similarity_layout.addLayout(results_layout)
 
         similarity_group.setLayout(similarity_layout)
         layout.addWidget(similarity_group)
-
         # Buttons
         button_box = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
