@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <!-- Background circle -->
+    <circle cx="50" cy="50" r="45" fill="#1A365D"/>
+    
+    <!-- Sound waves -->
+    <path d="M30 50 Q40 20, 50 50 T70 50" 
+          fill="none" 
+          stroke="#4299E1" 
+          stroke-width="4"
+          stroke-linecap="round"/>
+    
+    <!-- Second wave -->
+    <path d="M25 50 Q40 10, 50 50 T75 50" 
+          fill="none" 
+          stroke="#63B3ED" 
+          stroke-width="3"
+          stroke-linecap="round"/>
+    
+    <!-- Third wave -->
+    <path d="M20 50 Q40 0, 50 50 T80 50" 
+          fill="none" 
+          stroke="#90CDF4" 
+          stroke-width="2"
+          stroke-linecap="round"/>
+</svg>
