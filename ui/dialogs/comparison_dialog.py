@@ -16,14 +16,15 @@ class AudioComparisonDialog(QDialog):
     file1_changed = pyqtSignal(str)  # Signal for song to master
     file2_changed = pyqtSignal(str)  # Signal for reference song
 
-    def __init__(self, file1_path, file2_path=None, parent=None):
+# In each dialog class (SongDetailsDialog, AudioComparisonDialog, etc.):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.file1_path = file1_path
-        self.file2_path = file2_path
-        self.analyzer = AudioAnalyzer()
+        # Make dialog non-modal
+        self.setWindowModality(Qt.NonModal)
+        # Set window flags to make it independent
+        self.setWindowFlags(Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint)
         self.initUI()
-        self.analyze_files()
-
+        
     def initUI(self):
         self.setWindowTitle('Audio Comparison')
         self.setMinimumSize(1200, 800)

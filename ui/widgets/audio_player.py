@@ -13,6 +13,18 @@ class AudioPlayer(QWidget):
         self.initUI()
         self.setupConnections()
 
+    def closeEvent(self, event):
+        # Stop and clean up when window closes
+        self.player.stop()
+        self.player.setMedia(QMediaContent())
+        super().closeEvent(event)
+
+    def __del__(self):
+        # Clean up when object is destroyed
+        if hasattr(self, 'player'):
+            self.player.stop()
+            self.player.setMedia(QMediaContent())
+            
     def initUI(self):
         layout = QVBoxLayout()
         

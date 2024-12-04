@@ -2,12 +2,15 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QTextBrowser,
     QDialogButtonBox
 )
+from PyQt5.QtCore import Qt  # Add this import
 
 class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowModality(Qt.NonModal)
+        self.setWindowFlags(Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint)
         self.initUI()
-
+        
     def initUI(self):
         self.setWindowTitle('MAST - Help')
         self.setMinimumWidth(800)

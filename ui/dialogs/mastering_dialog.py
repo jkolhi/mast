@@ -3,6 +3,9 @@ from PyQt5.QtWidgets import (
     QPushButton, QComboBox, QLineEdit, QGroupBox,
     QDialogButtonBox, QFileDialog
 )
+from PyQt5.QtWidgets import QDialog, QVBoxLayout  # Add other widgets as needed
+from PyQt5.QtCore import Qt
+
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +14,10 @@ class MasteringOptionsDialog(QDialog):
         super().__init__(parent)
         self.target_name = target_name
         self.reference_name = reference_name
+        # Make dialog non-modal
+        self.setWindowModality(Qt.NonModal)
+        # Set window flags to make it independent
+        self.setWindowFlags(Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint)
         self.initUI()
 
     def initUI(self):

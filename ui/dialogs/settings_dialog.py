@@ -6,11 +6,18 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 class SettingsDialog(QDialog):
-    def __init__(self, settings, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
+        self.settings = None
+        self.setWindowModality(Qt.NonModal)
+        self.setWindowFlags(Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint)
+
+    def loadSettings(self, settings):
+        """Initialize dialog with QSettings"""
         self.settings = settings
         self.initUI()
-
+        self.show()
+        
     def initUI(self):
         self.setWindowTitle('MAST Settings')
         self.setMinimumWidth(500)
@@ -182,3 +189,31 @@ class SettingsDialog(QDialog):
         self.settings.setValue('similarity_threshold', self.threshold_slider.value() / 100.0)
         self.settings.setValue('max_results', self.max_results_input.text())
         self.settings.sync()
+
+    def show_settings(self):
+        dialog = SettingsDialog(self)  # Only pass parent
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.loadSettings(self.settings)  # Load settings separately
+        if dialog.exec_() == QDialog.Accepted:
+            dialog.save_settings()
+            self.music_directory = self.settings.value('default_directory', None)
+            if self.music_directory:
+                self.directory_label.setText(f'Selected: {self.music_directory}')
+            
+            self.similarity_options = {
+                'threshold': float(self.settings.value('similarity_threshold', 0.5)),
+                'max_results': int(self.settings.value('max_results', 50))
+            }
+        dialog = SettingsDialog(self)
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.loadSettings(self.settings)
+        if dialog.exec_() == QDialog.Accepted:
+            dialog.save_settings()
+            self.music_directory = self.settings.value('default_directory', None)
+            if self.music_directory:
+                self.directory_label.setText(f'Selected: {self.music_directory}')
+            
+            self.similarity_options = {
+                'threshold': float(self.settings.value('similarity_threshold', 0.5)),
+                'max_results': int(self.settings.value('max_results', 50))
+            }

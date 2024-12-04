@@ -27,20 +27,48 @@ from config.theme import COMBINED_STYLE
 class MASTWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Initialize settings
         self.settings = QSettings('JK', 'MAST')
+        
+        # Initialize file paths
         self.song_to_master = None
         self.reference_song = None
         self.music_directory = self.settings.value('default_directory', None)
+        
+        # Initialize state variables
         self.current_similarities = {}
+        self.open_dialogs = []
+        
+        # Initialize similarity options
         self.similarity_options = {
-            'threshold': float(self.settings.value('default_threshold', 0.5)),
-            'max_results': int(self.settings.value('default_max_results', 50))
+            'threshold': float(self.settings.value('similarity_threshold', 0.5)),
+            'max_results': int(self.settings.value('max_results', 50))
         }
+        
+        # Initialize UI
         self.initUI()
         
         # Update directory label if default directory exists
         if self.music_directory:
             self.directory_label.setText(f'Selected: {self.music_directory}')
+
+    def show_comparison_dialog(self):
+        if not self.song_to_master:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Please select a song to master first"
+            )
+            return
+
+        dialog = AudioComparisonDialog(
+            file1_path=self.song_to_master,
+            file2_path=self.reference_song if self.reference_song else None,
+            parent=self
+        )
+        dialog.setAttribute(Qt.WA_DeleteOnClose)
+        self.open_dialogs.append(dialog)
+        dialog.show()
 
     def initUI(self):
         self.setWindowTitle('MAST - Master Audio Similarity Tool')
@@ -284,28 +312,6 @@ class MASTWindow(QMainWindow):
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec_()    
 
-    def show_comparison_dialog(self):
-        if not self.song_to_master:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Please select a song to master first"
-            )
-            return
-
-        dialog = AudioComparisonDialog(
-            file1_path=self.song_to_master,
-            file2_path=self.reference_song if self.reference_song else None,
-            parent=self
-        )
-        
-        # Connect signals to update main window
-        dialog.file1_changed.connect(self.update_song_to_master)
-        dialog.file2_changed.connect(self.update_reference_song)
-        
-        dialog.setStyleSheet(self.styleSheet())
-        dialog.exec_()
-
     def update_song_to_master(self, file_path):
         self.song_to_master = file_path
         self.song_to_master_label.setText(f'Selected: {os.path.basename(file_path)}')
@@ -317,7 +323,9 @@ class MASTWindow(QMainWindow):
         self.update_master_button()
 
     def show_settings(self):
-        dialog = SettingsDialog(self.settings, self)
+        dialog = SettingsDialog(self)  # Only pass parent parameter
+        dialog.loadSettings(self.settings)  # Set settings separately
+        dialog.setStyleSheet(self.styleSheet())
         if dialog.exec_() == QDialog.Accepted:
             dialog.save_settings()
             self.music_directory = self.settings.value('default_directory', None)
@@ -325,9 +333,9 @@ class MASTWindow(QMainWindow):
                 self.directory_label.setText(f'Selected: {self.music_directory}')
             
             self.similarity_options = {
-                'threshold': float(self.settings.value('default_threshold', 0.5)),
-                'max_results': int(self.settings.value('default_max_results', 50))
-            }
+                'threshold': float(self.settings.value('similarity_threshold', 0.5)),
+                'max_results': int(self.settings.value('max_results', 50))
+            }     
 
     def show_help(self):
         dialog = HelpDialog(self)
@@ -359,15 +367,11 @@ class MASTWindow(QMainWindow):
         self.similar_songs_list.clear()
         self.progress_bar.setValue(0)
 
-        # Get threshold and max_results from settings
-        threshold = float(self.settings.value('similarity_threshold', 0.5))
-        max_results = int(self.settings.value('max_results', 50))
-
         self.comparison_thread = SimilarityThread(
             self.song_to_master,
             self.music_directory,
-            threshold,
-            max_results
+            self.similarity_options['threshold'],
+            self.similarity_options['max_results']
         )
         self.comparison_thread.update_progress.connect(self.progress_bar.setValue)
         self.comparison_thread.comparison_complete.connect(self.show_similar_songs)
@@ -394,7 +398,7 @@ class MASTWindow(QMainWindow):
             
         self.similar_songs_list.itemSelectionChanged.connect(self.update_play_button)
         self.similar_songs_list.itemDoubleClicked.connect(self.show_song_details)
-        
+      
     def use_selected_as_reference(self):
         current_item = self.similar_songs_list.currentItem()
         if not current_item:
@@ -435,9 +439,9 @@ class MASTWindow(QMainWindow):
         song_name = item.text().split(' (Similarity:')[0]
         for song_path in self.current_similarities.keys():
             if os.path.basename(song_path) == song_name:
-                dialog = SongDetailsDialog(song_path, self)
+                dialog = SongDetailsDialog(self)  # Pass only parent
                 dialog.setStyleSheet(self.styleSheet())
-                dialog.exec_()
+                dialog.loadSong(song_path)  # Load song path separately
                 break
 
     def update_mastering_progress(self, value):
@@ -456,7 +460,6 @@ class MASTWindow(QMainWindow):
         self.update_play_button()
         self.mastering_progress.hide()
         
-        # Get the output path
         output_path = str(Path(self.song_to_master).parent)
         
         # Show completion message
@@ -468,9 +471,9 @@ class MASTWindow(QMainWindow):
         
         # Show song details dialog for the mastered file
         if hasattr(self, 'mastering_thread') and hasattr(self.mastering_thread, 'output_path'):
-            dialog = SongDetailsDialog(str(self.mastering_thread.output_path), self)
+            dialog = SongDetailsDialog(self)
             dialog.setStyleSheet(self.styleSheet())
-            dialog.exec_()
+            dialog.loadSong(str(self.mastering_thread.output_path))
 
     def master_with_reference(self):
         if not self.song_to_master or not self.reference_song:

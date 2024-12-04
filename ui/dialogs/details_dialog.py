@@ -11,14 +11,23 @@ from ui.dialogs.analysis_dialog import AudioAnalysisDialog
 from ui.widgets.audio_player import AudioPlayer
 
 class SongDetailsDialog(QDialog):
-    def __init__(self, song_path, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
+        self.song_path = None
+        self.setWindowModality(Qt.NonModal)
+        self.setWindowFlags(Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint)
+
+    def loadSong(self, song_path):
+        """Initialize dialog with a song path"""
         self.song_path = song_path
         self.initUI()
+        self.show()
 
     def initUI(self):
+        if not self.song_path:
+            return
+
         self.setWindowTitle('Song Details')
-        self.setMinimumWidth(500)
         layout = QVBoxLayout()
 
         # Create a horizontal layout for artwork and details
@@ -239,9 +248,6 @@ class SongDetailsDialog(QDialog):
             return None
 
     def show_audio_analysis(self):
-        dialog = AudioAnalysisDialog(
-            file_path=self.song_path,
-            parent=self
-        )
+        dialog = AudioAnalysisDialog(self)
         dialog.setStyleSheet(self.styleSheet())
-        dialog.exec_()
+        dialog.loadFiles(self.song_path)  # Use loadFiles instead of passing in constructor

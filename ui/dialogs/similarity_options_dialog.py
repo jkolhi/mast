@@ -5,10 +5,15 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 class SimilarityOptionsDialog(QDialog):
+# In each dialog class (SongDetailsDialog, AudioComparisonDialog, etc.):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Make dialog non-modal
+        self.setWindowModality(Qt.NonModal)
+        # Set window flags to make it independent
+        self.setWindowFlags(Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint)
         self.initUI()
-
+        
     def initUI(self):
         self.setWindowTitle('Similarity Search Options')
         layout = QVBoxLayout()
