@@ -67,9 +67,6 @@ class SpectrogramVisualizer(QWidget):
             ax=self.ax,
             cmap='coolwarm'
         )
-        # Remove previous colorbars if they exist
-        if hasattr(self, 'colorbar'):
-            self.colorbar.remove()
         self.colorbar = self.figure.colorbar(img, ax=self.ax, format='%+2.0f dB')
         self._style_plot()
         self.canvas.draw()

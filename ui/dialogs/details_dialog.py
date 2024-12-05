@@ -251,3 +251,10 @@ class SongDetailsDialog(QDialog):
         dialog = AudioAnalysisDialog(self)
         dialog.setStyleSheet(self.styleSheet())
         dialog.loadFiles(self.song_path)  # Use loadFiles instead of passing in constructor
+        
+    def closeEvent(self, event):
+        """Override closeEvent to handle cleanup when dialog is closed"""
+        # Stop audio player if it exists
+        if hasattr(self, 'audio_player'):
+            self.audio_player.player.stop()
+        super().closeEvent(event)

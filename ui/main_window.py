@@ -54,21 +54,15 @@ class MASTWindow(QMainWindow):
 
     def show_comparison_dialog(self):
         if not self.song_to_master:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Please select a song to master first"
-            )
+            QMessageBox.warning(self, "Error", "Please select a song to master first")
             return
 
-        dialog = AudioComparisonDialog(
-            file1_path=self.song_to_master,
-            file2_path=self.reference_song if self.reference_song else None,
-            parent=self
+        dialog = AudioComparisonDialog(self)
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.loadFiles(
+            file1_path=self.song_to_master,  # Track to master
+            file2_path=self.reference_song   # Reference track
         )
-        dialog.setAttribute(Qt.WA_DeleteOnClose)
-        self.open_dialogs.append(dialog)
-        dialog.show()
 
     def initUI(self):
         self.setWindowTitle('MAST - Master Audio Similarity Tool')
@@ -266,7 +260,7 @@ class MASTWindow(QMainWindow):
         if file_path:
             self.reference_song = file_path
             self.reference_song_label.setText(f'Selected: {os.path.basename(file_path)}')
-            self.reference_player.loadFile(file_path)
+            self.reference_player.loadFile(file_path)  # Make sure reference player loads correct file
             self.update_master_button()
 
     def use_selected_as_reference(self):
@@ -282,6 +276,7 @@ class MASTWindow(QMainWindow):
                 self.reference_player.loadFile(song_path)
                 self.update_master_button()
                 break
+
     def select_music_directory(self):
         directory = QFileDialog.getExistingDirectory(
             self, 'Select Music Directory',
@@ -399,19 +394,6 @@ class MASTWindow(QMainWindow):
         self.similar_songs_list.itemSelectionChanged.connect(self.update_play_button)
         self.similar_songs_list.itemDoubleClicked.connect(self.show_song_details)
       
-    def use_selected_as_reference(self):
-        current_item = self.similar_songs_list.currentItem()
-        if not current_item:
-            return
-            
-        song_name = current_item.text().split(' (Similarity:')[0]
-        for song_path in self.current_similarities.keys():
-            if os.path.basename(song_path) == song_name:
-                self.reference_song = song_path
-                self.reference_song_label.setText(f'Selected: {os.path.basename(song_path)}')
-                self.update_master_button()
-                break
-
     def play_selected_song(self):
         current_item = self.similar_songs_list.currentItem()
         if not current_item:

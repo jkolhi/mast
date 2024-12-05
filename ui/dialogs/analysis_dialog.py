@@ -159,3 +159,10 @@ class AudioAnalysisDialog(QDialog):
         """
         self.info_label.setText(info_text)
         self.info_label.setTextFormat(Qt.RichText)
+
+    def closeEvent(self, event):
+        """Override closeEvent to handle cleanup when dialog is closed"""
+        # Stop audio player if it exists
+        if hasattr(self, 'audio_player'):
+            self.audio_player.player.stop()
+        super().closeEvent(event)
