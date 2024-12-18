@@ -10,6 +10,9 @@ MAST is a powerful audio analysis and mastering application that helps you find 
 - Batch processing capabilities
 - Metadata viewing and editing
 - Built-in audio visualization
+- High-quality audio resampling
+- Noise reduction and audio enhancement
+- Customizable mastering presets
 
 ## Installation
 
@@ -32,6 +35,16 @@ pip install -e .
 # Run the application
 mast
 ```
+
+## Building a macOS App
+
+To build a standalone macOS application, run the provided `build_macos.sh` script:
+
+```bash
+./build_macos.sh
+```
+
+The built app will be located in the `dist` directory.
 
 ## Requirements
 
