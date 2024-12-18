@@ -24,22 +24,38 @@ class CustomSplashScreen(QSplashScreen):
         self.label.resize(400, 200)
 
 def main():
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-    
-    # Create and show splash screen
-    splash = CustomSplashScreen()
-    splash.show()
-    app.processEvents()
-    
-    # Initialize main window
-    window = MASTWindow()
-    
-    # Hide splash and show window
-    window.show()
-    splash.finish(window)
-    
-    sys.exit(app.exec_())
+    try:
+        print("Starting application...")
+        app = QApplication(sys.argv)
+        print("QApplication created")
+        app.setStyle('Fusion')
+        print("Style set")
+        
+        # Create and show splash screen
+        splash = CustomSplashScreen()
+        print("Splash screen created")
+        splash.show()
+        print("Splash screen shown")
+        app.processEvents()
+        
+        print("Initializing main window...")
+        # Initialize main window
+        window = MASTWindow()
+        print("Main window created")
+        
+        # Hide splash and show window
+        window.show()
+        print("Main window shown")
+        splash.finish(window)
+        
+        print("Starting event loop...")
+        # Start the event loop
+        return app.exec_()
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return 1
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

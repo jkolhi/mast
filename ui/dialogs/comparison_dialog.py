@@ -1,23 +1,52 @@
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QTabWidget, QWidget, QGroupBox,
-    QFileDialog, QScrollArea
+    QTabWidget, QWidget
 )
-from PyQt5.QtCore import Qt
-from ..widgets.visualizers import WaveformVisualizer, SpectrogramVisualizer
-from ..widgets.audio_player import AudioPlayer
-from core.analyzer import AudioAnalyzer
-import os
-import mutagen
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QPixmap
 import librosa
 import numpy as np
+import os
+from datetime import datetime
+from ..widgets.visualizers import WaveformVisualizer, SpectrogramVisualizer
+from core.analyzer import AudioAnalyzer
+
+class AnalysisThread(QThread):
+    analysis_complete = pyqtSignal(dict, int)  # Analysis results, file number
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, file_path, file_num):
+        super().__init__()
+        self.file_path = file_path
+        self.file_num = file_num
+        
+    def run(self):
+        try:
+            y, sr = librosa.load(self.file_path)
+            spec = np.abs(librosa.stft(y))
+            spec_db = librosa.amplitude_to_db(spec, ref=np.max)
+            
+            tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
+            rms = librosa.feature.rms(y=y)[0]
+            
+            analysis = {
+                'waveform': y,
+                'sample_rate': sr,
+                'spectrogram': spec_db,
+                'duration': len(y) / sr,
+                'bpm': float(tempo),
+                'loudness': {
+                    'mean': float(np.mean(rms)),
+                    'max': float(np.max(rms)),
+                    'min': float(np.min(rms)),
+                    'dynamic_range': float(np.max(rms) - np.min(rms))
+                }
+            }
+            self.analysis_complete.emit(analysis, self.file_num)
+        except Exception as e:
+            self.error_occurred.emit(str(e))
 
 class AudioComparisonDialog(QDialog):
-    # Add these signals
-    file1_changed = pyqtSignal(str)  # Signal for song to master
-    file2_changed = pyqtSignal(str)  # Signal for reference song
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.file1_path = None
@@ -30,38 +59,20 @@ class AudioComparisonDialog(QDialog):
         self.file1_path = file1_path
         self.file2_path = file2_path
         self.initUI()
-        self.analyze_files()
-        self.show()
-
-    def update_info(self, file_num, analysis):
-        """Update audio information in the info tab"""
-        info_text = f"""
-        <h3 style='color: #63B3ED;'>{'Track to Master' if file_num == 1 else 'Reference Track'}</h3>
-        <p><b>Duration:</b> {analysis['duration']:.2f} seconds</p>
-        <p><b>BPM:</b> {analysis['bpm']:.1f}</p>
-        <p><b>Loudness:</b><br>
-        • Average: {analysis['loudness']['mean']:.2f} dB<br>
-        • Peak: {analysis['loudness']['max']:.2f} dB<br>
-        • Dynamic Range: {analysis['loudness']['dynamic_range']:.2f} dB</p>
-        """
         
-        if file_num == 1:
-            if not hasattr(self, 'track_info'):
-                self.track_info = QLabel()
-            self.track_info.setText(info_text)
-            self.track_info.setTextFormat(Qt.RichText)
-        else:
-            if not hasattr(self, 'reference_info'):
-                self.reference_info = QLabel()
-            self.reference_info.setText(info_text)
-            self.reference_info.setTextFormat(Qt.RichText)
-
-        # Update info tab if it exists
-        if hasattr(self, 'info_layout'):
-            if file_num == 1 and hasattr(self, 'track_info'):
-                self.info_layout.addWidget(self.track_info)
-            elif file_num == 2 and hasattr(self, 'reference_info'):
-                self.info_layout.addWidget(self.reference_info)
+        # Start analysis threads
+        self.thread1 = AnalysisThread(file1_path, 1)
+        self.thread1.analysis_complete.connect(self.handle_analysis_complete)
+        self.thread1.error_occurred.connect(self.handle_error)
+        self.thread1.start()
+        
+        if file2_path:
+            self.thread2 = AnalysisThread(file2_path, 2)
+            self.thread2.analysis_complete.connect(self.handle_analysis_complete)
+            self.thread2.error_occurred.connect(self.handle_error)
+            self.thread2.start()
+        
+        self.show()
 
     def initUI(self):
         if not self.file1_path:
@@ -82,29 +93,42 @@ class AudioComparisonDialog(QDialog):
 
         # Waveform tab
         waveform_tab = QWidget()
-        waveform_layout = QVBoxLayout(waveform_tab)
+        self.waveform_layout = QVBoxLayout(waveform_tab)
+        
+        # Track 1 loading section
+        self.loading_label1 = QLabel("Analyzing Track to Master...")
+        self.loading_label1.setStyleSheet("color: #4299E1;")
         self.waveform_viz1 = WaveformVisualizer()
-        waveform_layout.addWidget(QLabel("Track to Master"))
-        waveform_layout.addWidget(self.waveform_viz1)
+        self.waveform_layout.addWidget(QLabel("Track to Master"))
+        self.waveform_layout.addWidget(self.loading_label1)
+        self.waveform_layout.addWidget(self.waveform_viz1)
+        self.waveform_viz1.hide()  # Hide until analysis complete
         
         if self.file2_path:
+            self.loading_label2 = QLabel("Analyzing Reference Track...")
+            self.loading_label2.setStyleSheet("color: #4299E1;")
             self.waveform_viz2 = WaveformVisualizer()
-            waveform_layout.addWidget(QLabel("Reference Track"))
-            waveform_layout.addWidget(self.waveform_viz2)
+            self.waveform_layout.addWidget(QLabel("Reference Track"))
+            self.waveform_layout.addWidget(self.loading_label2)
+            self.waveform_layout.addWidget(self.waveform_viz2)
+            self.waveform_viz2.hide()  # Hide until analysis complete
         
         tab_widget.addTab(waveform_tab, "Waveforms")
 
         # Spectrum tab
         spectrum_tab = QWidget()
-        spectrum_layout = QVBoxLayout(spectrum_tab)
+        self.spectrum_layout = QVBoxLayout(spectrum_tab)
+        
         self.spectrum_viz1 = SpectrogramVisualizer()
-        spectrum_layout.addWidget(QLabel("Track to Master"))
-        spectrum_layout.addWidget(self.spectrum_viz1)
+        self.spectrum_layout.addWidget(QLabel("Track to Master"))
+        self.spectrum_layout.addWidget(self.spectrum_viz1)
+        self.spectrum_viz1.hide()  # Hide until analysis complete
         
         if self.file2_path:
             self.spectrum_viz2 = SpectrogramVisualizer()
-            spectrum_layout.addWidget(QLabel("Reference Track"))
-            spectrum_layout.addWidget(self.spectrum_viz2)
+            self.spectrum_layout.addWidget(QLabel("Reference Track"))
+            self.spectrum_layout.addWidget(self.spectrum_viz2)
+            self.spectrum_viz2.hide()  # Hide until analysis complete
         
         tab_widget.addTab(spectrum_tab, "Spectrums")
 
@@ -117,20 +141,20 @@ class AudioComparisonDialog(QDialog):
         track_info_layout.addWidget(QLabel("<h3>Track to Master</h3>"))
         
         # Artwork for track to master
-        track_artwork_label = QLabel()
-        track_artwork_label.setFixedSize(200, 200)
-        track_artwork_label.setAlignment(Qt.AlignCenter)
-        track_artwork_label.setStyleSheet("""
+        self.track_artwork_label = QLabel()
+        self.track_artwork_label.setFixedSize(200, 200)
+        self.track_artwork_label.setAlignment(Qt.AlignCenter)
+        self.track_artwork_label.setStyleSheet("""
             QLabel {
                 border: 1px solid #4299E1;
                 background-color: #2D3748;
                 border-radius: 4px;
             }
         """)
-        track_info_layout.addWidget(track_artwork_label)
+        track_info_layout.addWidget(self.track_artwork_label)
 
         # Info for track to master
-        self.track_info = QLabel()
+        self.track_info = QLabel("Loading...")
         self.track_info.setWordWrap(True)
         self.track_info.setTextFormat(Qt.RichText)
         track_info_layout.addWidget(self.track_info)
@@ -143,56 +167,101 @@ class AudioComparisonDialog(QDialog):
             ref_info_layout.addWidget(QLabel("<h3>Reference Track</h3>"))
             
             # Artwork for reference track
-            ref_artwork_label = QLabel()
-            ref_artwork_label.setFixedSize(200, 200)
-            ref_artwork_label.setAlignment(Qt.AlignCenter)
-            ref_artwork_label.setStyleSheet("""
+            self.ref_artwork_label = QLabel()
+            self.ref_artwork_label.setFixedSize(200, 200)
+            self.ref_artwork_label.setAlignment(Qt.AlignCenter)
+            self.ref_artwork_label.setStyleSheet("""
                 QLabel {
                     border: 1px solid #4299E1;
                     background-color: #2D3748;
                     border-radius: 4px;
                 }
             """)
-            ref_info_layout.addWidget(ref_artwork_label)
+            ref_info_layout.addWidget(self.ref_artwork_label)
 
             # Info for reference track
-            self.ref_info = QLabel()
+            self.ref_info = QLabel("Loading...")
             self.ref_info.setWordWrap(True)
             self.ref_info.setTextFormat(Qt.RichText)
             ref_info_layout.addWidget(self.ref_info)
             
             info_layout.addLayout(ref_info_layout)
 
-            # Extract and show artwork for reference track
-            try:
-                import mutagen
-                audio = mutagen.File(self.file2_path)
-                if audio is not None:
-                    pixmap = self._extract_artwork(audio)
-                    if pixmap is not None:
-                        scaled_pixmap = pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                        ref_artwork_label.setPixmap(scaled_pixmap)
-                    else:
-                        ref_artwork_label.setText("No\nArtwork")
-            except:
-                ref_artwork_label.setText("No\nArtwork")
+        tab_widget.addTab(info_tab, "Audio Info")
+        layout.addWidget(tab_widget)
 
-        # Extract and show artwork for track to master
+        # Load artwork immediately (no need to wait for analysis)
+        self.load_artwork()
+
+        # Apply dark theme style
+        self.setStyleSheet("""
+            QDialog, QWidget {
+                background-color: #1A365D;
+            }
+            QLabel {
+                color: #E2E8F0;
+                font-size: 12px;
+            }
+            QTabWidget::pane {
+                border: 1px solid #4299E1;
+                background-color: #2D3748;
+            }
+            QTabBar::tab {
+                background-color: #2D3748;
+                color: #E2E8F0;
+                padding: 8px 16px;
+                border: 1px solid #4299E1;
+            }
+            QTabBar::tab:selected {
+                background-color: #4299E1;
+            }
+        """)
+
+    def handle_analysis_complete(self, analysis, file_num):
+        if file_num == 1:
+            self.loading_label1.hide()
+            self.waveform_viz1.show()
+            self.spectrum_viz1.show()
+            self.waveform_viz1.plot_waveform(analysis['waveform'], analysis['sample_rate'])
+            self.spectrum_viz1.plot_spectrogram(analysis['spectrogram'], analysis['sample_rate'])
+            self.update_info(1, analysis)
+        else:
+            self.loading_label2.hide()
+            self.waveform_viz2.show()
+            self.spectrum_viz2.show()
+            self.waveform_viz2.plot_waveform(analysis['waveform'], analysis['sample_rate'])
+            self.spectrum_viz2.plot_spectrogram(analysis['spectrogram'], analysis['sample_rate'])
+            self.update_info(2, analysis)
+
+    def handle_error(self, error_msg):
+        print(f"Analysis error: {error_msg}")
+
+    def load_artwork(self):
+        """Load artwork immediately without waiting for analysis"""
         try:
             import mutagen
+            # Load track to master artwork
             audio = mutagen.File(self.file1_path)
             if audio is not None:
                 pixmap = self._extract_artwork(audio)
                 if pixmap is not None:
                     scaled_pixmap = pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    track_artwork_label.setPixmap(scaled_pixmap)
+                    self.track_artwork_label.setPixmap(scaled_pixmap)
                 else:
-                    track_artwork_label.setText("No\nArtwork")
-        except:
-            track_artwork_label.setText("No\nArtwork")
-
-        tab_widget.addTab(info_tab, "Audio Info")
-        layout.addWidget(tab_widget)
+                    self.track_artwork_label.setText("No\nArtwork")
+            
+            # Load reference track artwork
+            if self.file2_path:
+                audio = mutagen.File(self.file2_path)
+                if audio is not None:
+                    pixmap = self._extract_artwork(audio)
+                    if pixmap is not None:
+                        scaled_pixmap = pixmap.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        self.ref_artwork_label.setPixmap(scaled_pixmap)
+                    else:
+                        self.ref_artwork_label.setText("No\nArtwork")
+        except Exception as e:
+            print(f"Error loading artwork: {e}")
 
     def _extract_artwork(self, audio):
         """Extract artwork from audio file"""
@@ -229,110 +298,56 @@ class AudioComparisonDialog(QDialog):
             print(f"Error extracting artwork: {e}")
             return None
         
-    def select_file(self, file_num):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            f'Select {"Song to Master" if file_num == 1 else "Reference Song"}',
-            '',
-            'Audio Files (*.mp3 *.wav *.aif *.flac *.m4a *.ogg)'
-        )
-        if file_path:
-            if file_num == 1:
-                self.file1_path = file_path
-                self.file1_label.setText(os.path.basename(file_path))
-                self.player1.loadFile(file_path)
-                self.file1_changed.emit(file_path)  # Emit signal with new path
-            else:
-                self.file2_path = file_path
-                self.file2_label.setText(os.path.basename(file_path))
-                self.player2.loadFile(file_path)
-                self.file2_changed.emit(file_path)  # Emit signal with new path
-            self.analyze_files()
+    def update_info(self, file_num, analysis):
+        """Update audio information in the info tab"""
+        try:
+            import mutagen
+            file_path = self.file1_path if file_num == 1 else self.file2_path
+            audio = mutagen.File(file_path)
             
-    def analyze_files(self):
-        """Analyze the loaded audio files"""
-        try:
-            # Analyze first file (track to master)
-            if self.file1_path:
-                y1, sr1 = librosa.load(self.file1_path)
-                if len(y1) > 0:
-                    # Calculate spectrogram for first file
-                    spec1 = np.abs(librosa.stft(y1))
-                    spec_db1 = librosa.amplitude_to_db(spec1, ref=np.max)
-                    
-                    # Update visualizations for first file
-                    self.waveform_viz1.plot_waveform(y1, sr1)
-                    self.spectrum_viz1.plot_spectrogram(spec_db1, sr1)
+            stats = os.stat(file_path)
+            
+            info_text = f"""
+            <b>File Size:</b> {stats.st_size / (1024*1024):.2f} MB<br>
+            <b>Last Modified:</b> {datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M:%S')}<br>
+            """
+            
+            if audio is not None:
+                if hasattr(audio.info, 'sample_rate'):
+                    info_text += f"<b>Sample Rate:</b> {audio.info.sample_rate} Hz<br>"
+                if hasattr(audio.info, 'bitrate'):
+                    info_text += f"<b>Bit Rate:</b> {audio.info.bitrate // 1000} kbps<br>"
+                if hasattr(audio.info, 'channels'):
+                    info_text += f"<b>Channels:</b> {audio.info.channels}<br>"
 
-                    # Calculate and update info for first file
-                    tempo1, beats1 = librosa.beat.beat_track(y=y1, sr=sr1)
-                    rms1 = librosa.feature.rms(y=y1)[0]
-                    
-                    analysis1 = {
-                        'duration': len(y1) / sr1,
-                        'bpm': float(tempo1),
-                        'loudness': {
-                            'mean': float(np.mean(rms1)),
-                            'max': float(np.max(rms1)),
-                            'min': float(np.min(rms1)),
-                            'dynamic_range': float(np.max(rms1) - np.min(rms1))
-                        }
-                    }
-                    self.update_info(1, analysis1)
+            info_text += f"""
+            <b>Duration:</b> {analysis['duration']:.2f} seconds<br>
+            <b>BPM:</b> {analysis['bpm']:.1f}<br>
+            <b>Loudness:</b><br>
+            • Average: {analysis['loudness']['mean']:.2f} dB<br>
+            • Peak: {analysis['loudness']['max']:.2f} dB<br>
+            • Dynamic Range: {analysis['loudness']['dynamic_range']:.2f} dB<br>
+            """
 
-            # Analyze second file (reference track)
-            if self.file2_path:
-                y2, sr2 = librosa.load(self.file2_path)
-                if len(y2) > 0:
-                    # Calculate spectrogram for second file
-                    spec2 = np.abs(librosa.stft(y2))
-                    spec_db2 = librosa.amplitude_to_db(spec2, ref=np.max)
-                    
-                    # Update visualizations for second file
-                    self.waveform_viz2.plot_waveform(y2, sr2)
-                    self.spectrum_viz2.plot_spectrogram(spec_db2, sr2)
-
-                    # Calculate and update info for second file
-                    tempo2, beats2 = librosa.beat.beat_track(y=y2, sr=sr2)
-                    rms2 = librosa.feature.rms(y=y2)[0]
-                    
-                    analysis2 = {
-                        'duration': len(y2) / sr2,
-                        'bpm': float(tempo2),
-                        'loudness': {
-                            'mean': float(np.mean(rms2)),
-                            'max': float(np.max(rms2)),
-                            'min': float(np.min(rms2)),
-                            'dynamic_range': float(np.max(rms2) - np.min(rms2))
-                        }
-                    }
-                    self.update_info(2, analysis2)
-
-        except Exception as e:
-            print(f"Error analyzing files: {str(e)}")
-            import traceback
-            traceback.print_exc()
-
-    def update_metadata(self, file_num, analysis):
-        metadata_text = f"""
-        <b>Duration:</b> {analysis['duration']:.2f} seconds<br>
-        <b>BPM:</b> {analysis['bpm']:.1f}<br>
-        <b>Key:</b> {analysis['key']} {analysis['scale']}<br>
-        <b>Average Loudness:</b> {analysis['loudness']['mean']:.2f} dB<br>
-        <b>Dynamic Range:</b> {analysis['loudness']['dynamic_range']:.2f} dB
-        """
-        
-        try:
-            audio = mutagen.File(self.file1_path if file_num == 1 else self.file2_path)
-            if audio and hasattr(audio, 'tags'):
-                metadata_text += "<br><b>Tags:</b><br>"
+            if audio is not None and hasattr(audio, 'tags') and audio.tags:
+                info_text += "<br><b>Metadata Tags:</b><br>"
                 for key, value in audio.tags.items():
-                    if not isinstance(value, bytes):
-                        metadata_text += f"{key}: {value}<br>"
-        except:
-            pass
+                    if key.lower() not in ['apic', 'covr', 'cover art', 'picture', 'apic:cover']:
+                        if not isinstance(value, bytes) and not (isinstance(value, list) and any(isinstance(v, bytes) for v in value)):
+                            tag_value = str(value)
+                            if isinstance(value, list):
+                                tag_value = ', '.join(str(v) for v in value)
+                            info_text += f"{key}: {tag_value}<br>"
 
-        if file_num == 1:
-            self.file1_metadata.setText(metadata_text)
-        else:
-            self.file2_metadata.setText(metadata_text)
+            if file_num == 1:
+                self.track_info.setText(info_text)
+            else:
+                self.ref_info.setText(info_text)
+                
+        except Exception as e:
+            print(f"Error updating info: {e}")
+            info_text = "Error loading audio information"
+            if file_num == 1:
+                self.track_info.setText(info_text)
+            else:
+                self.ref_info.setText(info_text)

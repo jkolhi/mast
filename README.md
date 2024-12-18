@@ -49,4 +49,4 @@ mast
 
 ## License
 
-[Your chosen license]
+Apache License 2.0
